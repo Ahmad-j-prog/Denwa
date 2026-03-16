@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Gadgets available for purchase (new or refurbished)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the gadget" },
+        "description": { "type": "string", "description": "Detailed description" },
+        "price": { "type": "number", "description": "Price in USD" },
+        "category": { "type": "string", "enum": ["smartphone", "tablet", "laptop"], "description": "Category of the device" },
+        "condition": { "type": "string", "enum": ["new", "refurbished", "second-hand"], "description": "Condition of the device" },
+        "stock": { "type": "integer", "description": "Available quantity" },
+        "imageUrl": { "type": "string", "description": "URL to product image" },
+        "specs": { "type": "object", "description": "Technical specifications" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "price", "category", "condition", "stock"]
+    },
+    "UserListing": {
+      "title": "UserListing",
+      "description": "Gadgets submitted by users to be sold",
+      "type": "object",
+      "properties": {
+        "sellerId": { "type": "string", "description": "UID of the user selling the gadget" },
+        "sellerEmail": { "type": "string", "description": "Email of the seller" },
+        "name": { "type": "string", "description": "Name of the gadget" },
+        "description": { "type": "string", "description": "Description provided by user" },
+        "category": { "type": "string", "enum": ["smartphone", "tablet", "laptop"] },
+        "condition": { "type": "string", "enum": ["refurbished", "second-hand"] },
+        "expectedPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "Admin approval status" },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["sellerId", "name", "category", "condition", "expectedPrice", "status"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer purchase records",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "items": { "type": "array", "items": { "type": "object" } },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "paid", "shipped", "delivered"] },
+        "paymentInfo": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "items", "totalAmount", "status"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and role information",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": { "schema": "Product", "description": "Store gadgets for sale" },
+    "/userListings/{listingId}": { "schema": "UserListing", "description": "User gadgets pending review" },
+    "/orders/{orderId}": { "schema": "Order", "description": "Customer orders" },
+    "/users/{userId}": { "schema": "User", "description": "User profiles" }
+  }
+}

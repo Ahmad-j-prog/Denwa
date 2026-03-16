@@ -28,8 +28,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   onAuthStateChanged, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
+  signInAnonymously,
   signOut,
   User as FirebaseUser
 } from 'firebase/auth';
@@ -613,7 +612,7 @@ const ProductDetail = ({
   );
 };
 
-const SellGadget = ({ user }: { user: UserProfile | null }) => {
+const SellGadget = ({ user, onLogin }: { user: UserProfile | null, onLogin: () => void }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -677,7 +676,12 @@ const SellGadget = ({ user }: { user: UserProfile | null }) => {
         </div>
         <h1 className="text-3xl font-bold mb-4">Login to Sell</h1>
         <p className="text-gray-500 mb-8">You need to be logged in to list your gadgets for sale on our platform.</p>
-        <button className="px-8 py-3 bg-emerald-600 text-white rounded-full font-bold">Login with Google</button>
+        <button 
+          onClick={onLogin}
+          className="px-8 py-3 bg-emerald-600 text-white rounded-full font-bold hover:bg-emerald-700 transition-all"
+        >
+          Login to Demo
+        </button>
       </div>
     );
   }
@@ -1140,6 +1144,100 @@ const AdminPanel = ({
   );
 };
 
+// --- Login Modal ---
+
+const LoginModal = ({ onClose, onLogin }: { onClose: () => void, onLogin: (u: string, r: 'admin' | 'user') => void }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (username === 'admin' && password === '123') {
+      onLogin('admin', 'admin');
+    } else if (username === 'user' && password === '123') {
+      onLogin('user', 'user');
+    } else {
+      setError('Invalid credentials. Use admin/123 or user/123');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+      />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        className="relative w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden"
+      >
+        <div className="p-8 md:p-10">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-2xl font-bold text-gray-900">Demo Login</h2>
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 mb-8">
+            <p className="text-sm text-emerald-800 font-medium mb-1">Demo Credentials:</p>
+            <div className="grid grid-cols-2 gap-4 text-xs text-emerald-700">
+              <div>
+                <span className="font-bold">Admin:</span> admin / 123
+              </div>
+              <div>
+                <span className="font-bold">User:</span> user / 123
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gray-700">Username</label>
+              <input 
+                type="text" 
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder="admin or user"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gray-700">Password</label>
+              <input 
+                type="password" 
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="123"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                required
+              />
+            </div>
+
+            {error && (
+              <p className="text-sm text-red-500 font-medium">{error}</p>
+            )}
+
+            <button 
+              type="submit"
+              className="w-full py-4 bg-emerald-600 text-white rounded-full font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20"
+            >
+              Login to Demo
+            </button>
+          </form>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 // --- Main App ---
 
 export default function App() {
@@ -1149,6 +1247,7 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   useEffect(() => {
     // Auth Listener
@@ -1159,19 +1258,8 @@ export default function App() {
           if (userDoc.exists()) {
             setUser({ uid: firebaseUser.uid, ...userDoc.data() } as UserProfile);
           } else {
-            const newUser: UserProfile = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email || '',
-              displayName: firebaseUser.displayName || '',
-              role: firebaseUser.email === 'kl2508019635@student.uptm.edu.my' ? 'admin' : 'user'
-            };
-            await setDoc(doc(db, 'users', firebaseUser.uid), {
-              email: newUser.email,
-              displayName: newUser.displayName,
-              role: newUser.role,
-              createdAt: new Date().toISOString()
-            });
-            setUser(newUser);
+            // This case might happen if they were already logged in anonymously but doc was deleted
+            setUser(null);
           }
         } catch (err) {
           handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`);
@@ -1244,15 +1332,37 @@ export default function App() {
   }, [user]);
 
   const handleLogin = async () => {
+    setIsLoginModalOpen(true);
+  };
+
+  const onDemoLogin = async (username: string, role: 'admin' | 'user') => {
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
-    } catch (err: any) {
-      if (err.code === 'auth/popup-closed-by-user') {
-        console.log('Login popup closed by user');
-      } else {
-        console.error('Login error:', err);
-        alert('Login failed. Please try again.');
+      let uid: string;
+      try {
+        const cred = await signInAnonymously(auth);
+        uid = cred.user.uid;
+      } catch (authErr: any) {
+        if (authErr.code === 'auth/admin-restricted-operation') {
+          console.warn('Anonymous Auth disabled, using Mock UID for demo');
+          uid = `demo-${username}-${Date.now()}`;
+        } else {
+          throw authErr;
+        }
       }
+      
+      const userData = {
+        displayName: username.charAt(0).toUpperCase() + username.slice(1),
+        email: `${username}@demo.com`,
+        role: role,
+        createdAt: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'users', uid), userData);
+      setUser({ uid, ...userData });
+      setIsLoginModalOpen(false);
+    } catch (err: any) {
+      console.error('Demo login error:', err);
+      alert('Login failed: ' + err.message);
     }
   };
 
@@ -1380,12 +1490,21 @@ export default function App() {
           onLogout={handleLogout} 
         />
         
+        <AnimatePresence>
+          {isLoginModalOpen && (
+            <LoginModal 
+              onClose={() => setIsLoginModalOpen(false)} 
+              onLogin={onDemoLogin} 
+            />
+          )}
+        </AnimatePresence>
+
         <main>
           <Routes>
             <Route path="/" element={<Home products={products} />} />
             <Route path="/shop" element={<Shop products={products} />} />
             <Route path="/product/:id" element={<ProductDetail products={products} onAddToCart={addToCart} />} />
-            <Route path="/sell" element={<SellGadget user={user} />} />
+            <Route path="/sell" element={<SellGadget user={user} onLogin={handleLogin} />} />
             <Route path="/cart" element={<Cart items={cart} onUpdateQuantity={updateCartQuantity} onRemove={removeFromCart} onCheckout={handleCheckout} />} />
             <Route path="/admin" element={
               user?.role === 'admin' ? (
@@ -1405,8 +1524,22 @@ export default function App() {
                     <X size={40} />
                   </div>
                   <h1 className="text-3xl font-bold mb-4">Access Denied</h1>
-                  <p className="text-gray-500 mb-8">You do not have permission to access the admin panel. Please login with an admin account.</p>
-                  <Link to="/" className="px-8 py-3 bg-slate-900 text-white rounded-full font-bold">Return Home</Link>
+                  <p className="text-gray-500 mb-8">
+                    {user ? 'You do not have permission to access the admin panel.' : 'Please login with an admin account to access this page.'}
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    {!user && (
+                      <button 
+                        onClick={handleLogin}
+                        className="px-8 py-3 bg-emerald-600 text-white rounded-full font-bold hover:bg-emerald-700 transition-all"
+                      >
+                        Login to Demo
+                      </button>
+                    )}
+                    <Link to="/" className="px-8 py-3 bg-slate-900 text-white rounded-full font-bold hover:bg-slate-800 transition-all">
+                      Return Home
+                    </Link>
+                  </div>
                 </div>
               )
             } />
